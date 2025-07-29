@@ -1,0 +1,18 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+venv/
+.venv/
+
+# SQLite database
+db.sqlite3
+
+# Media uploads
+media/
+
+# IDE/editor config
+.vscode/
+.idea/

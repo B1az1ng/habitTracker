@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h2>My Habits</h2>
+
+  <p>
+    {% if total == 0 %}
+      You have no habits yet.
+    {% else %}
+      Progress: {{ done_count }} / {{ total }}
+      {% if all_done %}
+        – <strong>Day completed! 🎉</strong>
+      {% endif %}
+    {% endif %}
+  </p>
+
+  <a class="btn btn-success mb-3" href="{% url 'habit-add' %}">Add Habit</a>
+
+  <ul class="list-group">
+    {% for item in habits_data %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <div>
+          <strong>{{ item.obj.name }}</strong>
+          <div class="small text-muted">
+            {{ item.count }} / {{ item.goal }} times today
+            &nbsp;·&nbsp;Streak: {{ item.streak }}
+          </div>
+        </div>
+        <div class="btn-group">
+          <a href="{% url 'habit-increment' item.obj.pk %}"
+             class="btn btn-sm btn-outline-success">+</a>
+          <a href="{% url 'habit-decrement' item.obj.pk %}"
+             class="btn btn-sm btn-outline-danger">−</a>
+          <a href="{% url 'habit-edit' item.obj.pk %}"
+             class="btn btn-sm btn-outline-warning">Edit</a>
+          <a href="{% url 'habit-delete' item.obj.pk %}"
+             class="btn btn-sm btn-outline-secondary">Delete</a>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+{% endblock %}
