@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import date, timedelta
+import json
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -6,6 +7,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 
 from .forms import UserRegisterForm, ProfileUpdateForm, HabitForm
 from .models import Habit, Completion
+
 
 
 def register(request):
@@ -156,3 +158,54 @@ def decrement_completion(request, pk):
     except Completion.DoesNotExist:
         pass
     return redirect('habit-list')
+
+@login_required
+def statistics(request):
+    """
+    Prepare per-habit counts for last 7 days plus totals,
+    and a JSON blob for Chart.js.
+    """
+    today = date.today()
+
+    labels = [(today - timedelta(days=i)).isoformat() for i in range(6, -1, -1)]
+
+    habits = Habit.objects.filter(user=request.user).order_by('created_at')
+
+    per_habit = []
+    totals = [0] * 7  
+
+    for habit in habits:
+        counts = []
+        for i in range(6, -1, -1):
+            d = today - timedelta(days=i)
+            comp = Completion.objects.filter(habit=habit, date=d).first()
+            cnt = comp.count if comp else 0
+            counts.append(cnt)
+
+        totals = [t + c for t, c in zip(totals, counts)]
+
+        per_habit.append({
+            'id': habit.id,
+            'name': habit.name,
+            'counts': counts,
+            'goal': habit.daily_goal,
+            'total7': sum(counts),
+        })
+
+    totals_sum = sum(totals)
+
+    stats = {
+        'labels': labels,
+        'per_habit': [{ 'name': h['name'], 'counts': h['counts'] } for h in per_habit],
+        'totals': totals,
+    }
+    stats_json = json.dumps(stats)
+
+    context = {
+        'labels': labels,
+        'per_habit': per_habit,
+        'totals': totals,
+        'totals_sum': totals_sum,
+        'stats_json': stats_json,
+    }
+    return render(request, 'statistics.html', context)

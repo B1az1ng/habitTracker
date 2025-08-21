@@ -21,4 +21,7 @@ urlpatterns = [
     # Update habit 
     path('habit/<int:pk>/inc/', views.increment_completion, name='habit-increment'),
     path('habit/<int:pk>/dec/', views.decrement_completion, name='habit-decrement'),
+
+    # Statistics
+    path('stats/', views.statistics, name='statistics'),
 ]

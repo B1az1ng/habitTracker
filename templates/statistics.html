@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+<h2>Personal Statistics (last 7 days)</h2>
+  <a class="btn btn-outline-secondary" href="{% url 'habit-list' %}">Back to Habits</a>
+</div>
+
+<div class="mb-4">
+  <canvas id="stackedChart" height="5"></canvas>
+</div>
+
+<h5>Summary table</h5>
+<table class="table table-sm table-striped">
+  <thead>
+    <tr>
+      <th>Habit</th>
+      {% for d in labels %}
+        <th class="text-center">{{ d|date:"M d" }}</th>
+      {% endfor %}
+      <th class="text-center">Total (7d)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for h in per_habit %}
+      <tr>
+        <td>{{ h.name }}</td>
+        {% for c in h.counts %}
+          <td class="text-center">{{ c }}</td>
+        {% endfor %}
+        <td class="text-center">{{ h.total7 }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="{{ labels|length|add:'2' }}">No habits yet.</td></tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr>
+      <th>Totals</th>
+      {% for t in totals %}
+        <th class="text-center">{{ t }}</th>
+      {% endfor %}
+      <th class="text-center">{{ totals_sum }}</th>
+    </tr>
+  </tfoot>
+</table>
+
+<script id="stats-data" type="application/json">
+  {{ stats_json|safe }}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function() {
+  const dataEl = document.getElementById('stats-data');
+  const stats = JSON.parse(dataEl.textContent);
+
+  const labels = stats.labels.map(d => {
+    const dt = new Date(d);
+    return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  });
+
+  const datasets = [];
+
+  function randomColor(i) {
+    const hues = [220, 10, 50, 140, 260, 340, 30, 200, 90];
+    const hue = hues[i % hues.length];
+    return `hsl(${hue} 70% 50% / 0.9)`;
+  }
+
+  stats.per_habit.forEach(function(habit, idx) {
+    datasets.push({
+      label: habit.name,
+      data: habit.counts,
+      backgroundColor: randomColor(idx),
+      borderColor: 'transparent',
+      stack: 'stack1'
+    });
+  });
+
+  datasets.push({
+    type: 'line',
+    label: 'Total per day',
+    data: stats.totals,
+    borderColor: 'black',
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    tension: 0.2,
+    yAxisID: 'y',
+    fill: false,
+    pointRadius: 3
+  });
+
+  const ctx = document.getElementById('stackedChart').getContext('2d');
+  new Chart(ctx, {
+    data: { labels: labels, datasets: datasets },
+    options: {
+      plugins: { legend: { position: 'bottom' }, tooltip: { mode: 'index', intersect: false } },
+      responsive: true,
+      scales: {
+        x: { stacked: true },
+        y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Completions' } }
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}
