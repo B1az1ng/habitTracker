@@ -161,10 +161,6 @@ def decrement_completion(request, pk):
 
 @login_required
 def statistics(request):
-    """
-    Prepare per-habit counts for last 7 days plus totals,
-    and a JSON blob for Chart.js.
-    """
     today = date.today()
 
     labels = [(today - timedelta(days=i)).isoformat() for i in range(6, -1, -1)]
