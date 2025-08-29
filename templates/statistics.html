@@ -1,13 +1,14 @@
 {% extends 'base.html' %}
-{% load static %}
+{% block title %}Personal statistics — last 7 days{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2>Personal Statistics (last 7 days)</h2>
   <a class="btn btn-outline-secondary" href="{% url 'habit-list' %}">Back to Habits</a>
 </div>
 
-<div class="mb-4" style="max-width:900px;">
-  <canvas id="stackedChart" style="width:100%; height:260px; display:block;"></canvas>
+<div class="mb-4">
+  <canvas id="stackedChart" style="max-width:900px; width:100%; height:320px; display:block; margin:0 auto;"></canvas>
 </div>
 
 <h5>Summary table</h5>
@@ -31,7 +32,9 @@
         <td class="text-center">{{ h.total7 }}</td>
       </tr>
     {% empty %}
-      <tr><td colspan="{{ labels|length|add:'2' }}">No habits yet.</td></tr>
+      <tr>
+        <td colspan="{{ labels|length|add:'2' }}">No habits yet.</td>
+      </tr>
     {% endfor %}
   </tbody>
   <tfoot>
@@ -49,92 +52,111 @@
   {{ stats_json|safe }}
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <script>
-
-  (function(){
-  const dataEl = document.getElementById('stats-data');
-  if (!dataEl) {
-    console.warn('stats-data element not found');
-    return;
-  }
-
-  let stats = { labels: [], per_habit: [], totals: [] };
+(function(){
   try {
-    stats = JSON.parse(dataEl.textContent);
-  } catch (err) {
-    console.error('Failed to parse stats JSON:', err);
-  }
+    const dataEl = document.getElementById('stats-data');
+    if (!dataEl) {
+      console.warn('stats-data element not found');
+      return;
+    }
 
-  if (window.Chart && Chart.register) {
+    let stats = null;
     try {
-      Chart.register(...Chart.registerables);
+      stats = JSON.parse(dataEl.textContent);
     } catch (e) {
-      console.warn('Chart.register failed or already registered', e);
+      console.error('Failed to parse stats JSON', e);
+      return;
     }
-  }
 
-  if (!stats.per_habit || stats.per_habit.length === 0) {
-    return;
-  }
+    if (!stats || !Array.isArray(stats.labels) || !Array.isArray(stats.per_habit) || !Array.isArray(stats.totals)) {
+      console.error('Stats JSON has unexpected shape', stats);
+      return;
+    }
 
-  const labels = (stats.labels || []).map(d => {
-    const dt = new Date(d);
-    if (isNaN(dt)) return d;
-    return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  });
-
-  const datasets = [];
-
-  function randomColor(i) {
-    const hues = [220, 10, 50, 140, 260, 340, 30, 200, 90];
-    const hue = hues[i % hues.length];
-    return `hsl(${hue} 70% 50% / 0.9)`;
-  }
-
-  (stats.per_habit || []).forEach(function(habit, idx) {
-    datasets.push({
-      label: habit.name,
-      data: habit.counts,
-      backgroundColor: randomColor(idx),
-      borderColor: 'transparent',
-      stack: 'stack1'
+    const labels = stats.labels.map(d => {
+      const dt = new Date(d);
+      if (isNaN(dt)) return String(d);
+      return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     });
-  });
 
-  datasets.push({
-    type: 'line',
-    label: 'Total per day',
-    data: stats.totals || [],
-    borderColor: '#111',
-    backgroundColor: 'rgba(0,0,0,0.06)',
-    tension: 0.3,
-    yAxisID: 'y',
-    fill: false,
-    pointRadius: 3
-  });
+    const datasets = [];
 
-  const canvas = document.getElementById('stackedChart');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-
-  if (canvas._chartInstance) {
-    try { canvas._chartInstance.destroy(); } catch(e) {}
-  }
-
-  canvas._chartInstance = new Chart(ctx, {
-    data: { labels: labels, datasets: datasets },
-    options: {
-      plugins: { legend: { position: 'bottom' }, tooltip: { mode: 'index', intersect: false } },
-      responsive: true,
-      scales: {
-        x: { stacked: true },
-        y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Completions' } }
-      },
-      interaction: { mode: 'index', intersect: false }
+    function randomColor(i) {
+      const hues = [220, 10, 50, 140, 260, 340, 30, 200, 90];
+      const hue = hues[i % hues.length];
+      return `hsl(${hue} 70% 52% / 0.88)`;
     }
-  });
+
+    stats.per_habit.forEach(function(habit, idx) {
+      datasets.push({
+        label: habit.name || `Habit ${idx+1}`,
+        data: Array.isArray(habit.counts) ? habit.counts : [],
+        backgroundColor: randomColor(idx),
+        borderColor: 'transparent',
+        stack: 'stack1'
+      });
+    });
+
+    datasets.push({
+      type: 'line',
+      label: 'Total per day',
+      data: stats.totals,
+      borderColor: 'black',
+      backgroundColor: 'rgba(0,0,0,0.05)',
+      tension: 0.25,
+      yAxisID: 'y',
+      fill: false,
+      pointRadius: 3,
+      order: 2
+    });
+
+    if (typeof Chart === 'undefined') {
+      console.error('Chart.js is not loaded. Ensure chart.umd.min.js is included.');
+      return;
+    }
+
+    const canvas = document.getElementById('stackedChart');
+    if (!canvas) {
+      console.error('Canvas #stackedChart not found');
+      return;
+    }
+
+    const ctx = canvas.getContext('2d');
+
+    if (canvas._chartInstance) {
+      try { canvas._chartInstance.destroy(); } catch(e) {}
+    }
+
+    canvas._chartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: datasets
+      },
+      options: {
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12 } },
+          tooltip: { mode: 'index', intersect: false }
+        },
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { stacked: true },
+          y: {
+            stacked: true,
+            beginAtZero: true,
+            title: { display: true, text: 'Completions' }
+          }
+        }
+      }
+    });
+
+  } catch (err) {
+    console.error('Unexpected error in statistics script', err);
+  }
 })();
 </script>
 {% endblock %}
