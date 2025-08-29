@@ -1,12 +1,13 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-<h2>Personal Statistics (last 7 days)</h2>
+  <h2>Personal Statistics (last 7 days)</h2>
   <a class="btn btn-outline-secondary" href="{% url 'habit-list' %}">Back to Habits</a>
 </div>
 
-<div class="mb-4">
-  <canvas id="stackedChart" height="5"></canvas>
+<div class="mb-4" style="max-width:900px;">
+  <canvas id="stackedChart" style="width:100%; height:260px; display:block;"></canvas>
 </div>
 
 <h5>Summary table</h5>
@@ -48,14 +49,39 @@
   {{ stats_json|safe }}
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-(function() {
-  const dataEl = document.getElementById('stats-data');
-  const stats = JSON.parse(dataEl.textContent);
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
 
-  const labels = stats.labels.map(d => {
+<script>
+
+  (function(){
+  const dataEl = document.getElementById('stats-data');
+  if (!dataEl) {
+    console.warn('stats-data element not found');
+    return;
+  }
+
+  let stats = { labels: [], per_habit: [], totals: [] };
+  try {
+    stats = JSON.parse(dataEl.textContent);
+  } catch (err) {
+    console.error('Failed to parse stats JSON:', err);
+  }
+
+  if (window.Chart && Chart.register) {
+    try {
+      Chart.register(...Chart.registerables);
+    } catch (e) {
+      console.warn('Chart.register failed or already registered', e);
+    }
+  }
+
+  if (!stats.per_habit || stats.per_habit.length === 0) {
+    return;
+  }
+
+  const labels = (stats.labels || []).map(d => {
     const dt = new Date(d);
+    if (isNaN(dt)) return d;
     return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   });
 
@@ -67,7 +93,7 @@
     return `hsl(${hue} 70% 50% / 0.9)`;
   }
 
-  stats.per_habit.forEach(function(habit, idx) {
+  (stats.per_habit || []).forEach(function(habit, idx) {
     datasets.push({
       label: habit.name,
       data: habit.counts,
@@ -80,17 +106,24 @@
   datasets.push({
     type: 'line',
     label: 'Total per day',
-    data: stats.totals,
-    borderColor: 'black',
-    backgroundColor: 'rgba(0,0,0,0.05)',
-    tension: 0.2,
+    data: stats.totals || [],
+    borderColor: '#111',
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    tension: 0.3,
     yAxisID: 'y',
     fill: false,
     pointRadius: 3
   });
 
-  const ctx = document.getElementById('stackedChart').getContext('2d');
-  new Chart(ctx, {
+  const canvas = document.getElementById('stackedChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  if (canvas._chartInstance) {
+    try { canvas._chartInstance.destroy(); } catch(e) {}
+  }
+
+  canvas._chartInstance = new Chart(ctx, {
     data: { labels: labels, datasets: datasets },
     options: {
       plugins: { legend: { position: 'bottom' }, tooltip: { mode: 'index', intersect: false } },
@@ -98,7 +131,8 @@
       scales: {
         x: { stacked: true },
         y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Completions' } }
-      }
+      },
+      interaction: { mode: 'index', intersect: false }
     }
   });
 })();
