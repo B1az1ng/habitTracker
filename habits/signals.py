@@ -4,7 +4,8 @@ from django.dispatch import receiver
 from .models import Profile
 
 @receiver(post_save, sender=User)
-def create_or_update_user_profile(sender, instance, created, **kwargs): #Automatically create a profile whenever a new user is created.
+def create_or_update_user_profile(sender, instance, created, **kwargs):
     if created:
         Profile.objects.create(user=instance)
-    instance.profile.save()
+    else:
+        instance.profile.save()
